@@ -138,6 +138,19 @@ for i in range(K):
     significant = abs(B[i, 0]) > delta[i]
     print(f"Коэффициент регрессии β{i} = {B[i,0]}, Δ{i} = {delta[i]} => {'ЗНАЧИМ' if significant else 'НЕЗНАЧИМ'}")
 
+
+### (Доверительные интервалы для предсказаний) ###
+G = np.linalg.inv(X.T @ X)          # уже посчитана
+
+# Вычисляем x_i^T G x_i для каждой строки
+SE_mean = np.array([np.sqrt(Dad * x @ G @ x.T) for x in X])
+
+# Границы 95% доверительного интервала
+YR_lower = YR.flatten() - t * SE_mean
+YR_upper = YR.flatten() + t * SE_mean
+
+
+
 ### (ВИЗУАЛИЗАЦИЯ) ###
 
 # Визуализация сравнения реальных значений с предстаказанными
@@ -147,6 +160,7 @@ plt.figure(figsize=(14, 6))
 plt.subplot(1, 2, 1)
 plt.plot(dates, Y, 'o-', label='Реальное значение, Y', color='blue')
 plt.plot(dates, YR, 's--', label='Предсказанное значение, YR', color='red')
+plt.fill_between(dates, YR_lower, YR_upper, color='red', alpha=0.2, label='Доверительный интервал')
 plt.title('Реальные и предсказанные значения на исходной выборке\n(Модель M1 | K=9, N=24)')
 plt.xlabel('Дата и время наблюдения')
 plt.ylabel('Потребление электроэнергии, кВт*ч')
@@ -165,7 +179,7 @@ plt.xticks(rotation=45)
 plt.grid(True)
 
 plt.tight_layout()
-# plt.show()
+plt.show()
 
 
 
