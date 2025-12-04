@@ -97,13 +97,15 @@ RelativeError = MAE / Y.mean() * 100
 MAPE = (abs(Y - YR) / Y).mean() * 100
 WAPE = (abs(Y - YR).sum() / Y.sum()) * 100
 RSS = np.sum((Y - YR) ** 2)
-max_log_likelihood = -N/2 * np.log(2 * np.pi * RSS)
+max_log_likelihood = -N/2 * np.log(2 * np.pi * MSE) - N/2
 AIC = N * np.log(RSS) + 2 * K
 AICc = AIC + (2 * K * (K + 1)) / (N - K - 1)
 BIC = -2 * max_log_likelihood + K * np.log(N)
-# MallowsCp
+Cp = RSS / (MSE - (N - 2*K))
+# akaikeWeught
 # добавить дополнительные оценки
 
+# точность модели
 print(f"\n=== Качество модели внутри выборки ===")
 print(f"Коэффициент корреляции между Y и YR = {round(r, 4)}")
 # print(f"Коэффициент корреляции 2 между Y и YR = {round(r2, 4)}")
@@ -116,8 +118,10 @@ print(f"Абсолютная ошибка MAE = {round(MAE, 4)}, кВТ*ч")
 print(f"Относительная ошибка RE = {round(RelativeError, 4)}%")
 print(f"Cредняя абсолютная процентная ошибка MAPE = {round(MAPE, 4)}%")
 print(f"Взвешенная абсолютная процентная ошибка WAPE = {round(WAPE, 4)}%")
+print(f"Mallow's Cp = {round(Cp, 4)}")
+# объём потерянной информации - для сравнения моделей
 print(f"Информационный критерий Акаике (AIC) через RSS = {round(AIC, 4)}")
-print(f"Cкорректированный информационный критерий Акаике (AICc) через RSS = {round(AICc, 4)}")
+print(f"Cкорректированный информационный критерий Акаике (AICc) через RSS = {round(AICc, 4)}") # для молой выборки
 print(f"Критерий Байеса BIC = {round(BIC, 4)}")
 
 
@@ -139,19 +143,22 @@ for i in range(K):
     print(f"Коэффициент регрессии β{i} = {B[i,0]}, Δ{i} = {delta[i]} => {'ЗНАЧИМ' if significant else 'НЕЗНАЧИМ'}")
 
 
+
 ### (Доверительные интервалы для предсказаний) ###
-G = np.linalg.inv(X.T @ X)          # уже посчитана
+G = np.linalg.inv(X.T @ X) # уже посчитана
 
 # Вычисляем x_i^T G x_i для каждой строки
 SE_mean = np.array([np.sqrt(Dad * x @ G @ x.T) for x in X])
 
-# Границы 95% доверительного интервала
+# Границы доверительного коридора
 YR_lower = YR.flatten() - t * SE_mean
 YR_upper = YR.flatten() + t * SE_mean
 
 
 
 ### (ВИЗУАЛИЗАЦИЯ) ###
+
+# добавить обозначение разницы верхней и нижней границы доверительного коридора 3сигма (фото в репозитории)
 
 # Визуализация сравнения реальных значений с предстаказанными
 plt.figure(figsize=(14, 6))
@@ -179,7 +186,7 @@ plt.xticks(rotation=45)
 plt.grid(True)
 
 plt.tight_layout()
-plt.show()
+# plt.show()
 
 
 
