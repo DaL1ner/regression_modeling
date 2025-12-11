@@ -111,7 +111,7 @@ print(f"Коэффициент корреляции между Y и YR = {round(
 # print(f"Коэффициент корреляции 2 между Y и YR = {round(r2, 4)}")
 print(f"Коэффициент детерминации R² = {round(R_squared, 4)}")
 print(f"Скорректированный коэффициент детерминации R² adjusted = {round(R_squared_adjusted, 4)}")
-print(f"Среднеквадратичная ошибка MSE = {round(MSE, 4)}")
+print(f"Среднеквадратичная ошибка MSE = {round(MSE, 4)}, кВТ*ч")
 print(f"Корень среднеквадратичной ошибки RMSE = {round(RMSE, 4)}, кВТ*ч")
 print(f"Абсолютная ошибка MAE = {round(MAE, 4)}, кВТ*ч")
 # print(f"Абсолютная ошибка 2 MAE = {round(MAE2, 4)}, кВТ*ч")
@@ -120,8 +120,8 @@ print(f"Cредняя абсолютная процентная ошибка MAP
 print(f"Взвешенная абсолютная процентная ошибка WAPE = {round(WAPE, 4)}%")
 print(f"Mallow's Cp = {round(Cp, 4)}")
 # объём потерянной информации - для сравнения моделей
-print(f"Информационный критерий Акаике (AIC) через RSS = {round(AIC, 4)}")
-print(f"Cкорректированный информационный критерий Акаике (AICc) через RSS = {round(AICc, 4)}") # для молой выборки
+print(f"Информационный критерий Акаике AIC через RSS = {round(AIC, 4)}")
+print(f"Cкорректированный информационный критерий Акаике AICc через RSS = {round(AICc, 4)}") # для малой выборки
 print(f"Критерий Байеса BIC = {round(BIC, 4)}")
 
 
@@ -168,12 +168,37 @@ plt.subplot(1, 2, 1)
 plt.plot(dates, Y, 'o-', label='Реальное значение, Y', color='blue')
 plt.plot(dates, YR, 's--', label='Предсказанное значение, YR', color='red')
 plt.fill_between(dates, YR_lower, YR_upper, color='red', alpha=0.2, label='Доверительный интервал')
+
+i_annot = 5
+x_annot = dates.iloc[i_annot]
+y_upper = YR_upper[i_annot]
+y_lower = YR_lower[i_annot]
+offset_x = pd.Timedelta(hours=1)
+
+# Стрелка вверх (от верхней границы)
+plt.annotate('',
+             xy=(x_annot, y_upper),
+             xytext=(x_annot, y_upper + 15),
+             arrowprops=dict(arrowstyle='->', color='red', lw=1.5, mutation_scale=20))
+
+# Стрелка вниз (от нижней границы)
+plt.annotate('',
+             xy=(x_annot, y_lower),
+             xytext=(x_annot, y_lower - 15),
+             arrowprops=dict(arrowstyle='->', color='red', lw=1.5, mutation_scale=20))
+
+# Подпись "3σ"
+plt.text(x_annot - offset_x, y_upper + 17, '3σ',
+         fontsize=12, color='red', va='center', ha='center',
+         bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="red", alpha=0.8))
+
 plt.title('Реальные и предсказанные значения на исходной выборке\n(Модель M1 | K=9, N=24)')
 plt.xlabel('Дата и время наблюдения')
 plt.ylabel('Потребление электроэнергии, кВт*ч')
 plt.legend()
 plt.xticks(rotation=45)
 plt.grid(True)
+
 
 # График 2: Y и YR
 plt.subplot(1, 2, 2)
@@ -186,7 +211,7 @@ plt.xticks(rotation=45)
 plt.grid(True)
 
 plt.tight_layout()
-# plt.show()
+plt.show()
 
 
 
@@ -224,9 +249,39 @@ YR_test = X_test @ B
 
 # Оценка качества прогноза
 r_test, _ = pearsonr(Y_test, YR_test.flatten())
+R_squared_test = (1 - Dad/DY)
+R_squared_adjusted_test = 1 - ((1 - R_squared_test) * (N - 1) / (N - K - 1))
+MSE_test = np.sum((Y_test - YR_test) ** 2) / N
+RMSE_test = math.sqrt(MSE_test)
+MAE_test = abs(Y_test - YR_test).mean()
+MAE2_test = metrics.mean_absolute_error(Y_test, YR_test) # считаем тоже самое но другой функцией
+RelativeError_test = MAE_test / Y_test.mean() * 100
+MAPE_test = (abs(Y_test - YR_test) / Y_test).mean() * 100
+WAPE_test = (abs(Y_test - YR_test).sum() / Y_test.sum()) * 100
+RSS_test = np.sum((Y_test - YR_test) ** 2)
+max_log_likelihood_test = -N/2 * np.log(2 * np.pi * MSE_test) - N/2
+AIC_test = N * np.log(RSS_test) + 2 * K
+AICc_test = AIC_test + (2 * K * (K + 1)) / (N - K - 1)
+BIC_test = -2 * max_log_likelihood_test + K * np.log(N)
+Cp_test = RSS_test / (MSE_test - (N - 2*K))
+
+# точность модели
 print(f"\n=== Качество модели на новых данных ===")
 print(f"Коэффициент корреляции между Y и YR = {round(r_test, 4)}")
-# посчитать ошибки
+print(f"Коэффициент детерминации R² = {round(R_squared_test, 4)}")
+print(f"Скорректированный коэффициент детерминации R² adjusted = {round(R_squared_adjusted_test, 4)}")
+print(f"Среднеквадратичная ошибка MSE = {round(MSE_test, 4)}, кВТ*ч")
+print(f"Корень среднеквадратичной ошибки RMSE = {round(RMSE_test, 4)}, кВТ*ч")
+print(f"Абсолютная ошибка MAE = {round(MAE_test, 4)}, кВТ*ч")
+# print(f"Абсолютная ошибка 2 MAE = {round(MAE2_test, 4)}, кВТ*ч")
+print(f"Относительная ошибка RE = {round(RelativeError_test, 4)}%")
+print(f"Cредняя абсолютная процентная ошибка MAPE = {round(MAPE_test, 4)}%")
+print(f"Взвешенная абсолютная процентная ошибка WAPE = {round(WAPE_test, 4)}%")
+print(f"Mallow's Cp = {round(Cp_test, 4)}")
+# объём потерянной информации - для сравнения моделей
+print(f"Информационный критерий Акаике AIC через RSS = {round(AIC_test, 4)}")
+print(f"Cкорректированный информационный критерий Акаике AICc через RSS = {round(AICc_test, 4)}") # для малой выборки
+print(f"Критерий Байеса BIC = {round(BIC_test, 4)}")
 
 
 ### (ВИЗУАЛИЗАЦИЯ) ###
