@@ -14,11 +14,18 @@ class LinearRegressionModel(BaseModel):
     def __init__(self, df, target_col, name = None, alpha=0.05):
         super().__init__(df, target_col, name, alpha)
         self.features = []  # выбранные признаки (например, ['hour', 'day/night'])
-        self.coefficients = None
-        self.G = None  # матрица (X^T X)^{-1}
-        self.Dad = None  # дисперсия адекватности
+        self.B = None # коэффициенты модели
+        self.Y = None # зависимая переменная потребления электроэнергии обучающей выборки
+        self.YR = None # предсказанные значения на обучающей выборке
+        self.Y_test = None # зависимая переменная потребления электроэнергии тестовой выборки
+        self.YR_test = None # предсказанные значения на тестовой выборке
+
+        self.G = None  # матрица нормальных уравнений
+        self.Dad = None  # дисперсия адекватности на обучающей выборке
+        self.Dad_test = None  # дисперсия адекватности на тестовой выборке
         self.t_crit = None  # критическое значение t
-        self.N = None  # число наблюдений
+        self.N = None  # число наблюдений обучающей выборки
+        self.N_test = None  # число наблюдений тестовой выборки (с учётом обучающей)
         self.K = None  # число параметров
 
     def _build_X_matrix(self, range, features):
@@ -32,7 +39,6 @@ class LinearRegressionModel(BaseModel):
                 name = feat
                 values = subset[name].values
             elif isinstance(feat, tuple) and len(feat) == 2:
-                # Новый формат: (имя, функция)
                 name, func = feat
                 values = func(subset).values
             else:
@@ -48,38 +54,38 @@ class LinearRegressionModel(BaseModel):
         return X, dates
 
     def predict(self, X):
-        """Предсказывает для новых данных"""
+        """Выдаёт матрицу-столбец Y с предсказанием"""
         if not self.is_fitted:
             raise Exception("Модель не обучена")
-        return X @ self.coefficients
+        return X @ self.B
 
     def fit(self, train_range, features):
+        """Обучает модель на указанных индексах и признаках"""
         self.features = features
-        self.X_train, self.dates_train = self._build_X_matrix(train_range, features)
+        X, self.dates_train = self._build_X_matrix(train_range, features)
         self.Y = self.df.iloc[train_range][self.target_col].values.reshape(-1, 1)
         self.Y = self.Y.reshape(-1)
 
-        # МНК: B = (X^T X)^{-1} X^T Y
-        XtX = self.X_train.T @ self.X_train
-        self.G = np.linalg.inv(XtX)
-        self.coefficients = self.G @ self.X_train.T @ self.Y
+        # МНК
+        self.G = np.linalg.inv(X.T @ X)
+        self.B = self.G @ X.T @ self.Y
         self.is_fitted = True
 
         # Предсказания на обучающей выборке
-        self.YR = self.predict(self.X_train).flatten()
+        self.YR = self.predict(X).flatten()
 
         # Дисперсия адекватности
         self.N = len(train_range)
-        self.K = self.X_train.shape[1]
+        self.K = X.shape[1]
         self.Dad = np.sum((self.Y - self.YR) ** 2) / (self.N - self.K)
 
-        # Критическое значение t
-        self.t_crit = t.ppf(1 - self.alpha/2, self.N - self.K)
+        # табличное значение t-критерия Стьюдента
+        self.t = t.ppf(1 - self.alpha/2, self.N - self.K)
 
         # Доверительные интервалы для предсказаний
-        self.SE_mean = np.array([np.sqrt(self.Dad * x @ self.G @ x.T) for x in self.X_train])
-        self.YR_lower = self.YR.flatten() - self.t_crit * self.SE_mean
-        self.YR_upper = self.YR.flatten() + self.t_crit * self.SE_mean
+        self.SE_mean = np.array([np.sqrt(self.Dad * x @ self.G @ x.T) for x in X])
+        self.YR_lower = self.YR.flatten() - self.t * self.SE_mean
+        self.YR_upper = self.YR.flatten() + self.t * self.SE_mean
 
         # Расчёт метрик
         self.calculate_metrics(self.Y, self.YR, prefix='train')
@@ -87,19 +93,80 @@ class LinearRegressionModel(BaseModel):
         return self
 
     def forecast(self, test_range):
-        """Даёт прогноз на тестовые данные и сохраняет результаты для визуализации"""
+        """Даёт прогноз на тестовые данные"""
         if not self.is_fitted:
             raise Exception("Модель не обучена")
 
         # Собираем X_test
         X_test, self.dates_test = self._build_X_matrix(test_range, self.features)
         self.Y_test = self.df.iloc[test_range][self.target_col].values
+
+        # Предсказания на тестовой выборке
         self.YR_test = self.predict(X_test).flatten()
+
+        G_test = np.linalg.inv(X_test.T @ X_test)
+
+        # Дисперсия адекватности
+        self.N_test = len(test_range)
+        self.Dad_test = np.sum((self.Y - self.YR) ** 2) / (self.N_test - self.K)
+
+        # табличное значение t-критерия Стьюдента
+        t_test = t.ppf(1 - self.alpha/2, self.N - self.K)
+
+        # Доверительные интервалы для предсказаний
+        self.SE_mean_test = np.array([np.sqrt(self.Dad_test * x @ G_test @ x.T) for x in X_test])
+        self.YR_lower_test = self.YR.flatten() - t_test * self.SE_mean
+        self.YR_upper_test = self.YR.flatten() + t_test * self.SE_mean
 
         # Расчёт метрик на тесте
         self.calculate_metrics(self.Y_test, self.YR_test, prefix='test')
 
         return self.YR_test
+
+    def validate(self, print=True):
+        """Проверка адекватности (F-тест)"""
+        if not self.is_fitted:
+            raise Exception("Модель не обучена")
+
+        # Среднее Y
+        self.YSR = np.mean(self.Y)
+
+        # Дисперсия Y (без учёта модели)
+        self.DY = np.sum((self.Y - self.YSR) ** 2) / (self.N - 1)
+
+        # Расчётный F-критерий
+        self.FR = self.DY / self.Dad
+
+        # Табличное значение F (для α=0.05)
+        F = f.ppf(1 - 0.05, self.N - 1, self.N - self.K)
+
+        if print:
+            # Вывод
+            print(f"Модель M1: N = {self.N}, K = {self.K}")
+            print("\n=== Оценка адекватности модели ===")
+            print(f"Расчётное значение F-критерия Фишшера = {round(self.FR, 4)}")
+            print(f"Табличное значение F-критерия Фишшера F(α=0.05) = {round(F, 4)}")
+            if self.FR > F:
+                print("=> Модель адекватна по критерию Фишшера")
+            else:
+                print("=> Модель неадекватна по критерию Фишшера")
+
+        return self.FR
+
+    def test_coefficients(self):
+        """Проверка значимости коэффициентов (t-тест)"""
+        if not self.is_fitted:
+            raise Exception("Модель не обучена")
+
+        # Доверительные интервалы (полуширина) коэффициентов регрессии
+        delta = self.t * np.sqrt(self.Dad * np.diag(self.G))
+
+        print("\n=== Проверка значимости коэфициентов ===")
+        for i in range(self.K):
+            significant = abs(self.B[i, 0]) > delta[i]
+            print(f"Коэффициент регрессии β{i} = {self.B[i,0]}, Δ{i} = {delta[i]} => {'ЗНАЧИМ' if significant else 'НЕЗНАЧИМ'}")
+
+
 
     def plot_training(self, show_ci=True):
         plt.figure(figsize=(14, 6))

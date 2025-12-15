@@ -20,11 +20,15 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def predict(self, X_new):
-        """Даёт предсказания для новых данных"""
+    def predict(self, X):
+        """Выдаёт матрицу-столбец Y с предсказанием"""
         pass
 
-    def validate(self):
+    def forecast(self, test_range):
+        """Даёт прогноз на тестовые данные"""
+        pass
+
+    def validate(self, print=True):
         """Проверка адекватности (F-тест)"""
         pass
 
@@ -32,14 +36,14 @@ class BaseModel(ABC):
         """Проверка значимости коэффициентов (t-тест)"""
         pass
 
-    def calculate_metrics(self, Y_true, YR, prefix):
+    def calculate_metrics(self, Y, YR, prefix):
         """Считает все метрики качества"""
         pass
 
     def plot_training(self, show_ci=True):
-        """Строит график для обучающей выборки (как у тебя первый график)"""
+        """Строит график для обучающей выборки"""
         pass
 
     def plot_forecast(self, test_range):
-        """Строит график прогноза на новые данные (как у тебя третий график)"""
+        """Строит график прогноза на новые данные"""
         pass
