@@ -11,6 +11,7 @@ class BaseModel(ABC):
         self.Y = None
         self.YR = None
         self.metrics_train = {} # список рассчитанных метрик для обучающей выборки
+        self.metrics_test = {} # список рассчитанных метрик для тестовой выборки
         self.is_fitted = False
         self.name = name
 
@@ -28,7 +29,7 @@ class BaseModel(ABC):
         """Даёт прогноз на тестовые данные"""
         pass
 
-    def validate(self, print=True):
+    def validate(self, show=True):
         """Проверка адекватности (F-тест)"""
         pass
 

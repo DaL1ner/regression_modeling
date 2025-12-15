@@ -19,10 +19,9 @@ class LinearRegressionModel(BaseModel):
         self.YR = None # предсказанные значения на обучающей выборке
         self.Y_test = None # зависимая переменная потребления электроэнергии тестовой выборки
         self.YR_test = None # предсказанные значения на тестовой выборке
-
         self.G = None  # матрица нормальных уравнений
         self.Dad = None  # дисперсия адекватности на обучающей выборке
-        self.Dad_test = None  # дисперсия адекватности на тестовой выборке
+        # self.Dad_test = None  # дисперсия адекватности на тестовой выборке
         self.t_crit = None  # критическое значение t
         self.N = None  # число наблюдений обучающей выборки
         self.N_test = None  # число наблюдений тестовой выборки (с учётом обучающей)
@@ -53,6 +52,84 @@ class LinearRegressionModel(BaseModel):
 
         return X, dates
 
+    def calculate_metrics(self, Y, YR, prefix):
+        """Считает все метрики качества"""
+
+        if prefix == 'test':
+            N = self.N_test
+            YSR = np.mean(self.Y)
+            DY = np.sum((Y - YSR) ** 2) / (N - 1)
+
+            r, p_val = pearsonr(Y.flatten(), YR.flatten()) # корреляция между Y и YR
+            R_squared = (1 - self.Dad/DY)
+            R_squared_adjusted = 1 - ((1 - R_squared) * (N - 1) / (N - self.K - 1))
+            MSE = np.sum((Y - YR) ** 2) / N
+            RMSE = math.sqrt(MSE)
+            MAE = abs(Y - YR).mean()
+            RelativeError = MAE / Y.mean() * 100
+            MAPE = (abs(Y - YR) / Y).mean() * 100
+            WAPE = (abs(Y - YR).sum() / Y.sum()) * 100
+            RSS = np.sum((Y - YR) ** 2)
+
+            metrics_dict = {
+                'Коэффициент корреляции R': round(r, 4),
+                'Коэффициент детерминации R²': round(R_squared, 4),
+                'Скорректированный коэффициент детерминации R² adjusted': round(R_squared_adjusted, 4),
+                'Среднеквадратичная ошибка MSE': round(MSE, 4),
+                'Корень среднеквадратичной ошибки RMSE': round(RMSE, 4),
+                'Абсолютная ошибка MAE': round(MAE, 4),
+                'Относительная ошибка RE': round(RelativeError, 4),
+                'Cредняя абсолютная процентная ошибка MAPE': round(MAPE, 4),
+                'Взвешенная абсолютная процентная ошибка WAPE': round(WAPE, 4),
+                'RSS': round(RSS, 4),
+            }
+        elif prefix == 'train' and self.Y is not None:
+            N = self.N
+            YSR = np.mean(Y)
+            DY = np.sum((Y - YSR) ** 2) / (N - 1)
+
+            r, p_val = pearsonr(Y.flatten(), YR.flatten())
+            R_squared = (1 - self.Dad/DY)
+            R_squared_adjusted = 1 - ((1 - R_squared) * (N - 1) / (N - self.K - 1))
+            MSE = np.sum((Y - YR) ** 2) / N
+            RMSE = math.sqrt(MSE)
+            MAE = abs(Y - YR).mean()
+            RelativeError = MAE / Y.mean() * 100
+            MAPE = (abs(Y - YR) / Y).mean() * 100
+            WAPE = (abs(Y - YR).sum() / Y.sum()) * 100
+            RSS = np.sum((Y - YR) ** 2)
+            max_log_likelihood = -N/2 * np.log(2 * np.pi * MSE) - N/2
+            AIC = N * np.log(RSS) + 2 * self.K
+            AICc = AIC + (2 * self.K * (self.K + 1)) / (N - self.K - 1)
+            BIC = -2 * max_log_likelihood + self.K * np.log(N)
+            Cp = RSS / (MSE - (N - 2*self.K))
+
+            metrics_dict = {
+                'Коэффициент корреляции R': round(r, 4),
+                'Коэффициент детерминации R²': round(R_squared, 4),
+                'Скорректированный коэффициент детерминации R² adjusted': round(R_squared_adjusted, 4),
+                'Среднеквадратичная ошибка MSE': round(MSE, 4),
+                'Корень среднеквадратичной ошибки RMSE': round(RMSE, 4),
+                'Абсолютная ошибка MAE': round(MAE, 4),
+                'Относительная ошибка RE': round(RelativeError, 4),
+                'Cредняя абсолютная процентная ошибка MAPE': round(MAPE, 4),
+                'Взвешенная абсолютная процентная ошибка WAPE': round(WAPE, 4),
+                'RSS': round(RSS, 4),
+                'Информационный критерий Акаике AIC': round(AIC, 4),
+                'Cкорректированный информационный критерий Акаике AICc': round(AICc, 4),
+                'Критерий Байеса BIC': round(BIC, 4),
+                'Mallows Cp': round(Cp, 4)
+            }
+        else:
+            raise Exception("Неверный префикс")
+
+        if prefix == 'train':
+            self.metrics_train = metrics_dict
+        elif prefix == 'test':
+            self.metrics_test = metrics_dict
+
+        return metrics_dict
+
     def predict(self, X):
         """Выдаёт матрицу-столбец Y с предсказанием"""
         if not self.is_fitted:
@@ -68,7 +145,7 @@ class LinearRegressionModel(BaseModel):
 
         # МНК
         self.G = np.linalg.inv(X.T @ X)
-        self.B = self.G @ X.T @ self.Y
+        self.B = (self.G @ X.T @ self.Y).reshape(-1, 1)
         self.is_fitted = True
 
         # Предсказания на обучающей выборке
@@ -104,54 +181,54 @@ class LinearRegressionModel(BaseModel):
         # Предсказания на тестовой выборке
         self.YR_test = self.predict(X_test).flatten()
 
-        G_test = np.linalg.inv(X_test.T @ X_test)
+        # G_test = np.linalg.inv(X_test.T @ X_test)
 
         # Дисперсия адекватности
         self.N_test = len(test_range)
-        self.Dad_test = np.sum((self.Y - self.YR) ** 2) / (self.N_test - self.K)
+        # self.Dad_test = np.sum((self.Y_test - self.YR_test) ** 2) / (self.N_test - self.K)
 
         # табличное значение t-критерия Стьюдента
         t_test = t.ppf(1 - self.alpha/2, self.N - self.K)
 
         # Доверительные интервалы для предсказаний
-        self.SE_mean_test = np.array([np.sqrt(self.Dad_test * x @ G_test @ x.T) for x in X_test])
-        self.YR_lower_test = self.YR.flatten() - t_test * self.SE_mean
-        self.YR_upper_test = self.YR.flatten() + t_test * self.SE_mean
+        self.SE_mean_test = np.array([np.sqrt(self.Dad * x @ self.G @ x.T) for x in X_test])
+        self.YR_lower_test = self.YR_test.flatten() - t_test * self.SE_mean_test
+        self.YR_upper_test = self.YR_test.flatten() + t_test * self.SE_mean_test
 
         # Расчёт метрик на тесте
         self.calculate_metrics(self.Y_test, self.YR_test, prefix='test')
 
         return self.YR_test
 
-    def validate(self, print=True):
+    def validate(self, show=True):
         """Проверка адекватности (F-тест)"""
         if not self.is_fitted:
             raise Exception("Модель не обучена")
 
         # Среднее Y
-        self.YSR = np.mean(self.Y)
+        YSR = np.mean(self.Y)
 
         # Дисперсия Y (без учёта модели)
-        self.DY = np.sum((self.Y - self.YSR) ** 2) / (self.N - 1)
+        DY = np.sum((self.Y - YSR) ** 2) / (self.N - 1)
 
         # Расчётный F-критерий
-        self.FR = self.DY / self.Dad
+        FR = DY / self.Dad
 
         # Табличное значение F (для α=0.05)
         F = f.ppf(1 - 0.05, self.N - 1, self.N - self.K)
 
-        if print:
-            # Вывод
+        # Вывод
+        if show:
             print(f"Модель M1: N = {self.N}, K = {self.K}")
             print("\n=== Оценка адекватности модели ===")
-            print(f"Расчётное значение F-критерия Фишшера = {round(self.FR, 4)}")
+            print(f"Расчётное значение F-критерия Фишшера = {round(FR, 4)}")
             print(f"Табличное значение F-критерия Фишшера F(α=0.05) = {round(F, 4)}")
-            if self.FR > F:
+            if FR > F:
                 print("=> Модель адекватна по критерию Фишшера")
             else:
                 print("=> Модель неадекватна по критерию Фишшера")
 
-        return self.FR
+        return FR
 
     def test_coefficients(self):
         """Проверка значимости коэффициентов (t-тест)"""
@@ -225,6 +302,9 @@ class LinearRegressionModel(BaseModel):
         all_dates = pd.concat([self.dates_train, self.dates_test])
         all_Y = np.concatenate([self.Y.flatten(), self.Y_test])
         all_YR = np.concatenate([self.YR.flatten(), self.YR_test])
+        # Доверительный интервал для прогноза
+        all_YR_lower = np.concatenate([self.YR_lower, self.YR_lower_test])
+        all_YR_upper = np.concatenate([self.YR_upper, self.YR_upper_test])
 
         plt.figure(figsize=(14, 6))
         train_size = len(self.dates_train)
@@ -237,6 +317,22 @@ class LinearRegressionModel(BaseModel):
                  color='gray', label='Реальное (прогноз)', markersize=4, alpha=0.7)
         plt.plot(all_dates[train_size:], all_YR[train_size:], 'd--',
                  color='purple', label='Прогноз (24 ч вперёд)', markersize=5)
+
+        # Заливка для прогноза
+        plt.fill_between(
+            all_dates[train_size:],
+            all_YR_lower[train_size:],
+            all_YR_upper[train_size:],
+            color='purple', alpha=0.2, label='Доверительный интервал (прогноз)'
+        )
+
+        # Заливка для обучения
+        plt.fill_between(
+            all_dates[:train_size],
+            all_YR_lower[:train_size],
+            all_YR_upper[:train_size],
+            color='crimson', alpha=0.2, label='Доверительный интервал (обучение)'
+        )
 
         plt.title('Прогноз потребления электроэнергии')
         plt.xlabel('Дата и время наблюдения')
