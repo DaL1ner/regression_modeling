@@ -17,7 +17,7 @@ test_range = range(216, 240)  # следующие 24 наблюдения
 
 # Создаём несколько моделей
 model1 = LinearRegressionModel(df, target_col='Ypowerconsumption', name='M999')
-model1.fit(train_range, ['X0 Фиктивная переменная', 'hour'])
+model1.fit(train_range, ['X0 Фиктивная переменная', 'hour', 'temp'])
 
 model2 = LinearRegressionModel(df, target_col='Ypowerconsumption', name='M9999')
 model2.fit(train_range, [
@@ -29,6 +29,7 @@ model2.fit(train_range, [
 # Прогноз для обеих
 model1.forecast(test_range)
 model2.forecast(test_range)
+model1.plot_forecast()
 
 # Сравнение
 comparator = ModelComparator([model1, model2])

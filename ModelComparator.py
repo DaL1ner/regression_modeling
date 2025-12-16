@@ -7,7 +7,7 @@ class ModelComparator:
     def compare_metrics(self, metrics_to_show=None, on='train'):
         """Сравнивает модели по указанным метрикам"""
         if metrics_to_show is None:
-            metrics_to_show = ['Коэффициент детерминации R²', 'RMSE', 'MAE']
+            metrics_to_show = ['R²', 'RMSE', 'MAE']
 
         results = {}
         for model in self.models:

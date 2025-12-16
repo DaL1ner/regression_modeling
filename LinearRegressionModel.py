@@ -72,15 +72,15 @@ class LinearRegressionModel(BaseModel):
             RSS = np.sum((Y - YR) ** 2)
 
             metrics_dict = {
-                'Коэффициент корреляции R': round(r, 4),
-                'Коэффициент детерминации R²': round(R_squared, 4),
-                'Скорректированный коэффициент детерминации R² adjusted': round(R_squared_adjusted, 4),
-                'Среднеквадратичная ошибка MSE': round(MSE, 4),
-                'Корень среднеквадратичной ошибки RMSE': round(RMSE, 4),
-                'Абсолютная ошибка MAE': round(MAE, 4),
-                'Относительная ошибка RE': round(RelativeError, 4),
-                'Cредняя абсолютная процентная ошибка MAPE': round(MAPE, 4),
-                'Взвешенная абсолютная процентная ошибка WAPE': round(WAPE, 4),
+                'R': round(r, 4), # Коэффициент корреляции
+                'R²': round(R_squared, 4), # Коэффициент детерминации
+                'R² adjusted': round(R_squared_adjusted, 4), # Скорректированный коэффициент детерминации
+                'MSE': round(MSE, 4), # Среднеквадратичная ошибка
+                'RMSE': round(RMSE, 4), # Корень среднеквадратичной ошибки
+                'MAE': round(MAE, 4), # Абсолютная ошибка
+                'RE': round(RelativeError, 4), # Относительная ошибка
+                'MAPE': round(MAPE, 4), # Cредняя абсолютная процентная ошибка
+                'WAPE': round(WAPE, 4), # Взвешенная абсолютная процентная ошибка
                 'RSS': round(RSS, 4),
             }
         elif prefix == 'train' and self.Y is not None:
@@ -105,20 +105,20 @@ class LinearRegressionModel(BaseModel):
             Cp = RSS / (MSE - (N - 2*self.K))
 
             metrics_dict = {
-                'Коэффициент корреляции R': round(r, 4),
-                'Коэффициент детерминации R²': round(R_squared, 4),
-                'Скорректированный коэффициент детерминации R² adjusted': round(R_squared_adjusted, 4),
-                'Среднеквадратичная ошибка MSE': round(MSE, 4),
-                'Корень среднеквадратичной ошибки RMSE': round(RMSE, 4),
-                'Абсолютная ошибка MAE': round(MAE, 4),
-                'Относительная ошибка RE': round(RelativeError, 4),
-                'Cредняя абсолютная процентная ошибка MAPE': round(MAPE, 4),
-                'Взвешенная абсолютная процентная ошибка WAPE': round(WAPE, 4),
-                'RSS': round(RSS, 4),
-                'Информационный критерий Акаике AIC': round(AIC, 4),
-                'Cкорректированный информационный критерий Акаике AICc': round(AICc, 4),
-                'Критерий Байеса BIC': round(BIC, 4),
-                'Mallows Cp': round(Cp, 4)
+                'R': round(r, 4), # Коэффициент корреляции
+                'R²': round(R_squared, 4), # Коэффициент детерминации
+                'R² adjusted': round(R_squared_adjusted, 4), # Скорректированный коэффициент детерминации
+                'MSE': round(MSE, 4), # Среднеквадратичная ошибка
+                'RMSE': round(RMSE, 4), # Корень среднеквадратичной ошибки
+                'MAE': round(MAE, 4), # Абсолютная ошибка
+                'RE': round(RelativeError, 4), # Относительная ошибка
+                'MAPE': round(MAPE, 4), # Cредняя абсолютная процентная ошибка
+                'WAPE': round(WAPE, 4), # Взвешенная абсолютная процентная ошибка
+                'RSS': round(RSS, 4), #
+                'AIC': round(AIC, 4), # Информационный критерий Акаике
+                'AICc': round(AICc, 4), # Cкорректированный информационный критерий Акаике
+                'BIC': round(BIC, 4), # Критерий Байеса
+                'Mallows Cp': round(Cp, 4) #
             }
         else:
             raise Exception("Неверный префикс")
@@ -302,37 +302,46 @@ class LinearRegressionModel(BaseModel):
         all_dates = pd.concat([self.dates_train, self.dates_test])
         all_Y = np.concatenate([self.Y.flatten(), self.Y_test])
         all_YR = np.concatenate([self.YR.flatten(), self.YR_test])
-        # Доверительный интервал для прогноза
         all_YR_lower = np.concatenate([self.YR_lower, self.YR_lower_test])
         all_YR_upper = np.concatenate([self.YR_upper, self.YR_upper_test])
 
         plt.figure(figsize=(14, 6))
         train_size = len(self.dates_train)
 
+        # Реальное значение (обучение)
         plt.plot(all_dates[:train_size], all_Y[:train_size], 'o-',
                  color='steelblue', label='Реальное (обучение)', markersize=4)
+
+        # Предсказанное (обучение)
         plt.plot(all_dates[:train_size], all_YR[:train_size], 's--',
                  color='crimson', label='Прогноз (обучение)', markersize=4)
-        plt.plot(all_dates[train_size:], all_Y[train_size:], 'o-',
-                 color='gray', label='Реальное (прогноз)', markersize=4, alpha=0.7)
-        plt.plot(all_dates[train_size:], all_YR[train_size:], 'd--',
-                 color='purple', label='Прогноз (24 ч вперёд)', markersize=5)
 
-        # Заливка для прогноза
-        plt.fill_between(
-            all_dates[train_size:],
-            all_YR_lower[train_size:],
-            all_YR_upper[train_size:],
-            color='purple', alpha=0.2, label='Доверительный интервал (прогноз)'
-        )
+        # Реальное значение (тест)
+        plt.plot(all_dates[train_size-1:], all_Y[train_size-1:], 'o-',
+                 color='gray', label='Реальное (тест)', markersize=4, alpha=0.7)
 
-        # Заливка для обучения
+        # Предсказанное (тест)
+        plt.plot(all_dates[train_size-1:], all_YR[train_size-1:], 'd--',
+                 color='purple', label='Прогноз (тест)', markersize=5)
+
+        # Доверительные интервалы
         plt.fill_between(
             all_dates[:train_size],
             all_YR_lower[:train_size],
             all_YR_upper[:train_size],
             color='crimson', alpha=0.2, label='Доверительный интервал (обучение)'
         )
+        plt.fill_between(
+            all_dates[train_size-1:],
+            all_YR_lower[train_size-1:],
+            all_YR_upper[train_size-1:],
+            color='purple', alpha=0.2, label='Доверительный интервал (тест)'
+        )
+
+        # Вертикальная пунктирная линия на стыке
+        boundary_date = self.dates_train.iloc[-1]  # последняя дата обучения
+        plt.axvline(x=boundary_date, color='black', linestyle='--', linewidth=1, label='Граница обучения')
+
 
         plt.title('Прогноз потребления электроэнергии')
         plt.xlabel('Дата и время наблюдения')
