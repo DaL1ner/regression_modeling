@@ -321,7 +321,7 @@ class LinearRegressionModel(BaseModel):
                  color='gray', label='Реальное (тест)', markersize=4, alpha=0.7)
 
         # Предсказанное (тест)
-        plt.plot(all_dates[train_size-1:], all_YR[train_size-1:], 'd--',
+        plt.plot(all_dates[train_size:], all_YR[train_size:], 'd--',
                  color='purple', label='Прогноз (тест)', markersize=5)
 
         # Доверительные интервалы
@@ -332,9 +332,9 @@ class LinearRegressionModel(BaseModel):
             color='crimson', alpha=0.2, label='Доверительный интервал (обучение)'
         )
         plt.fill_between(
-            all_dates[train_size-1:],
-            all_YR_lower[train_size-1:],
-            all_YR_upper[train_size-1:],
+            all_dates[train_size:],
+            all_YR_lower[train_size:],
+            all_YR_upper[train_size:],
             color='purple', alpha=0.2, label='Доверительный интервал (тест)'
         )
 

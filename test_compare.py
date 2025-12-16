@@ -29,7 +29,7 @@ model2.fit(train_range, [
 # Прогноз для обеих
 model1.forecast(test_range)
 model2.forecast(test_range)
-model1.plot_forecast()
+# model1.plot_forecast()
 
 # Сравнение
 comparator = ModelComparator([model1, model2])
@@ -38,3 +38,6 @@ print(comparator.compare_metrics(on='train'))
 
 print("\nСравнение на тесте:")
 print(comparator.compare_metrics(on='test'))
+
+# Выводим общий график
+comparator.plot_all_models([model1, model2], plot_type='forecast')
