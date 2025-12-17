@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
+pd.set_option('display.max_columns', None)
+
 class ModelComparator:
     def __init__(self, models):
         self.models = models  # список обученных моделей
@@ -10,6 +12,22 @@ class ModelComparator:
         """Сравнивает модели по указанным метрикам"""
         if metrics_to_show is None:
             metrics_to_show = ['R²', 'RMSE', 'MAE']
+
+        if metrics_to_show == 'all':
+            metrics_to_show = ['R',
+                               'R²',
+                               'R² adjusted',
+                               'MSE',
+                               'RMSE',
+                               'MAE',
+                               'RE',
+                               'MAPE',
+                               'WAPE',
+                               'RSS',
+                               'AIC',
+                               'AICc',
+                               'BIC',
+                               'Mallows Cp']
 
         results = {}
         for model in self.models:
@@ -38,6 +56,34 @@ class ModelComparator:
         if n_models == 0:
             print("Нет моделей для визуализации")
             return
+
+
+        # Находим минимум и максимум для всех моделей
+        all_values = []
+        for model in models:
+            if plot_type == 'training':
+                all_values.extend(model.Y)
+                all_values.extend(model.YR)
+                if show_ci:
+                    all_values.extend(model.YR_lower)
+                    all_values.extend(model.YR_upper)
+            elif plot_type == 'forecast':
+                all_Y = np.concatenate([model.Y.flatten(), model.Y_test])
+                all_YR = np.concatenate([model.YR.flatten(), model.YR_test])
+                all_values.extend(all_Y)
+                all_values.extend(all_YR)
+                if show_ci:
+                    all_YR_lower = np.concatenate([model.YR_lower, model.YR_lower_test])
+                    all_YR_upper = np.concatenate([model.YR_upper, model.YR_upper_test])
+                    all_values.extend(all_YR_lower)
+                    all_values.extend(all_YR_upper)
+
+        global_ymin = min(all_values)
+        global_ymax = max(all_values)
+        y_margin = (global_ymax - global_ymin) * 0.05  # небольшой отступ
+        global_ymin -= y_margin
+        global_ymax += y_margin
+
 
         # Определяем размер фигуры
         fig_height = 6 * n_models
@@ -90,6 +136,8 @@ class ModelComparator:
                 boundary_date = model.dates_train.iloc[-1]  # последняя дата обучения
                 plt.axvline(x=boundary_date, color='black', linestyle='--', linewidth=1, label='Граница обучения')
 
+                ax.set_ylim(global_ymin, global_ymax) # УСТАНОВКА ОБЩЕГО МАСШТАБА
+
             elif plot_type == 'forecast':
                 # График прогноза
                 all_dates = pd.concat([model.dates_train, model.dates_test])
@@ -125,7 +173,7 @@ class ModelComparator:
                     color='purple', alpha=0.2, label='Доверительный интервал (прогноз)'
                 )
 
-                ax.set_title(f'Прогноз потребления электроэнергии — Модель {model.name}')
+                ax.set_title(f'Модель {model.name}')
                 ax.set_ylabel('Потребление, кВт*ч')
                 ax.grid(True, alpha=0.3)
                 if i == 0:
@@ -135,6 +183,8 @@ class ModelComparator:
                 # Вертикальная пунктирная линия на стыке
                 boundary_date = model.dates_train.iloc[-1]  # последняя дата обучения
                 ax.axvline(x=boundary_date, color='black', linestyle='--', linewidth=1, label='Граница обучения')
+
+                ax.set_ylim(global_ymin, global_ymax) # УСТАНОВКА ОБЩЕГО МАСШТАБА
 
             # Подписываем ось X только на последнем графике
             if i == n_models - 1:

@@ -219,7 +219,7 @@ class LinearRegressionModel(BaseModel):
 
         # Вывод
         if show:
-            print(f"Модель M1: N = {self.N}, K = {self.K}")
+            print(f"Модель {self.name}: N = {self.N}, K = {self.K}")
             print("\n=== Оценка адекватности модели ===")
             print(f"Расчётное значение F-критерия Фишшера = {round(FR, 4)}")
             print(f"Табличное значение F-критерия Фишшера F(α=0.05) = {round(F, 4)}")
